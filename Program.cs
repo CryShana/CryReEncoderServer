@@ -124,10 +124,10 @@ app.MapPost("/", async (HttpContext context) =>
             request.Headers.TryAddWithoutValidation(h.Key, h.Value.ToArray());
 
         // Forward to target url
-        log.LogInformation("File '{0}' forwarding to URL: '{1}'", final_path, target_url);
+        log.LogInformation("File '{0}' forwarding to '{1}'", final_filename, target_url);
         using var response = await http.SendAsync(request, context.RequestAborted);
         context.Response.StatusCode = (int)response.StatusCode;
-        log.LogInformation("File '{0}' forward response: {1}", final_path, response.StatusCode);
+        log.LogInformation("File '{0}' forward response: {1}", final_filename, response.StatusCode);
 
         // Copy headers from response (we cannot copy everything)
         foreach (var h in response.Headers)
