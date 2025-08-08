@@ -89,7 +89,7 @@ app.MapPost("/", async (HttpContext context) =>
 
         if (profile != null)
         {
-            log.LogInformation("File '{0}' started encoding", out_path);
+            log.LogInformation("File '{0}' now encoding", out_path);
 
             using var encoder = new EncodingProcess(out_path, profile);
             if (!active_tasks.TryUpdate(out_path, encoder, null))
@@ -98,7 +98,7 @@ app.MapPost("/", async (HttpContext context) =>
             if (!await encoder.RunAsync())
                 throw new Exception("Failed to encode file: " + out_path);
 
-            log.LogInformation("File '{0}' finished encoding to '{1}'", out_path, encoder.OutputPath);
+            log.LogInformation("File '{0}' encoded to '{1}'", out_path, encoder.OutputPath);
             final_path = encoder.OutputPath ?? throw new Exception("Missing encoded path");
             final_content_type = profile.content_type ?? final_content_type;
 
@@ -124,10 +124,10 @@ app.MapPost("/", async (HttpContext context) =>
             request.Headers.TryAddWithoutValidation(h.Key, h.Value.ToArray());
 
         // Forward to target url
-        log.LogInformation("File '{0}' ({1}) being forwarded to target URL: '{2}'", file.FileName, final_path, target_url);
+        log.LogInformation("File '{0}' forwarding to URL: '{1}'", final_path, target_url);
         using var response = await http.SendAsync(request, context.RequestAborted);
         context.Response.StatusCode = (int)response.StatusCode;
-        log.LogInformation("Received response {0} from forwarded request for file '{1}'", response.StatusCode, file.FileName);
+        log.LogInformation("File '{0}' forward response: {1}", final_path, response.StatusCode);
 
         // Copy headers from response (we cannot copy everything)
         foreach (var h in response.Headers)
