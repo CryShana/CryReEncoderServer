@@ -21,6 +21,9 @@ builder.Logging.SetMinimumLevel(LogLevel.Information);
 builder.Logging.AddFilter("Microsoft.AspNetCore.Routing.EndpointMiddleware", LogLevel.None);
 builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.None);
 
+// no limit
+builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = config.max_body_size_mb == 0 ? null : (config.max_body_size_mb * 1024 * 1024));
+
 var app = builder.Build();
 
 var factory = app.Services.GetRequiredService<ILoggerFactory>();
@@ -89,7 +92,7 @@ app.MapPost("/", async (HttpContext context) =>
 
         if (profile != null)
         {
-            log.LogInformation("File '{0}' now encoding", out_path);
+            log.LogInformation("File '{0}' now encoding", file.FileName);
 
             using var encoder = new EncodingProcess(out_path, profile);
             if (!active_tasks.TryUpdate(out_path, encoder, null))
@@ -98,7 +101,7 @@ app.MapPost("/", async (HttpContext context) =>
             if (!await encoder.RunAsync())
                 throw new Exception("Failed to encode file: " + out_path);
 
-            log.LogInformation("File '{0}' encoded to '{1}'", out_path, encoder.OutputPath);
+            log.LogInformation("File '{0}' encoded to '{1}'", file.FileName, encoder.OutputPath);
             final_path = encoder.OutputPath ?? throw new Exception("Missing encoded path");
             final_content_type = profile.content_type ?? final_content_type;
 
@@ -140,7 +143,6 @@ app.MapPost("/", async (HttpContext context) =>
         await response.Content.CopyToAsync(context.Response.Body);
 
         return Results.Empty;
-
     }
     catch (Exception ex)
     {

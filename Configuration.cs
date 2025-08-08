@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 public class Configuration
 {
     public uint listen_port { get; set; } = 9200;
+    public uint max_body_size_mb { get; set; } = 5000;
     public EncodingProfile[] encoding_profiles { get; set; } = [
         new() {
             command = "-c:v libsvtav1 -preset 5 -crf 40 -g 240 -svtav1-params tune=0:fast-decode=1 -c:a libopus -ac 2 -b:a 128k",
