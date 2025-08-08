@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Net.Http.Headers;
+using Microsoft.AspNetCore.Http.Features;
 
 // clear temp directory from any last runs
 const string TEMP_DIRECTORY = "temp";
@@ -23,6 +24,7 @@ builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.N
 
 // no limit
 builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = config.max_body_size_mb == 0 ? null : (config.max_body_size_mb * 1024 * 1024));
+builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = config.max_body_size_mb == 0 ? long.MaxValue : (config.max_body_size_mb * 1024 * 1024));
 
 var app = builder.Build();
 
