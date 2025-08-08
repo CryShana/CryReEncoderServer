@@ -4,8 +4,48 @@ using System.Text.Json.Serialization;
 public class Configuration
 {
     public uint listen_port { get; set; } = 9200;
-    public string? encode_command { get; set; } = "-c:v libsvtav1 -preset 5 -crf 40 -g 240 -svtav1-params tune=0:fast-decode=1 -c:a libopus -ac 2 -b:a 128k";
-    public string[] encode_types { get; set; } = [
+    public EncodingProfile[] encoding_profiles { get; set; } = [
+        new() {
+            command = "-c:v libsvtav1 -preset 5 -crf 40 -g 240 -svtav1-params tune=0:fast-decode=1 -c:a libopus -ac 2 -b:a 128k",
+            extension = "webm",
+            content_type = "video/webm"
+        }
+    ];
+
+    public static Configuration LoadOrCreateNew()
+    {
+        Configuration conf;
+        if (!File.Exists("config.json"))
+        {
+            conf = new Configuration();
+            File.WriteAllText("config.json", JsonSerializer.Serialize(conf, JsonContext.Default.Configuration));
+            return conf;
+        }
+
+        var text = File.ReadAllText("config.json");
+        conf = JsonSerializer.Deserialize(text, JsonContext.Default.Configuration) ?? new();
+        return conf;
+    }
+}
+
+public class EncodingProfile
+{
+    /// <summary>
+    /// FFmpeg command, excludes the input and output
+    /// </summary>
+    public string? command { get; set; } = "-c:v libx264 -crf 30 -preset medium";
+    /// <summary>
+    /// Output extension
+    /// </summary>
+    public string? extension { get; set; } = "mp4";
+    /// <summary>
+    /// Output content type
+    /// </summary>
+    public string? content_type { get; set; } = "video/mp4";
+    /// <summary>
+    /// Content types that are targeted by this profile
+    /// </summary>
+    public string[] target_types { get; set; } = [
         "video/mp4",                // .mp4
         "video/mpeg",               // .mpeg, .mpg
         "video/webm",               // .webm
@@ -23,22 +63,6 @@ public class Configuration
         "video/x-f4v",              // .f4v
         "video/x-ms-asf"            // .asf
     ];
-
-
-    public static Configuration LoadOrCreateNew()
-    {
-        Configuration conf;
-        if (!File.Exists("config.json"))
-        {
-            conf = new Configuration();
-            File.WriteAllText("config.json", JsonSerializer.Serialize(conf, JsonContext.Default.Configuration));
-            return conf;
-        }
-
-        var text = File.ReadAllText("config.json");
-        conf = JsonSerializer.Deserialize(text, JsonContext.Default.Configuration) ?? new();
-        return conf;
-    }
 }
 
 [JsonSourceGenerationOptions(WriteIndented = true)]

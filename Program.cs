@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Headers;
+﻿using System.Collections.Concurrent;
+using System.Net.Http.Headers;
 
 // clear temp directory from any last runs
 const string TEMP_DIRECTORY = "temp";
@@ -25,13 +26,17 @@ var app = builder.Build();
 var factory = app.Services.GetRequiredService<ILoggerFactory>();
 var log = factory.CreateLogger("ReEncoder");
 
-
-app.MapGet("/", () => "CryReEncoder is active and listening, please use POST method");
-
-var active_paths = new HashSet<string>();
-var active_paths_lock = new Lock();
+var active_tasks = new ConcurrentDictionary<string, EncodingProcess?>();
+var csc = new CancellationTokenSource();
 var http = new HttpClient();
 
+Console.CancelKeyPress += (_, b) =>
+{
+    csc.Cancel();
+    b.Cancel = true;
+};
+
+app.MapGet("/", () => "CryReEncoder is active and listening, please use POST method");
 app.MapPost("/", async (HttpContext context) =>
 {
     if (!context.Request.HasFormContentType)
@@ -56,11 +61,12 @@ app.MapPost("/", async (HttpContext context) =>
     Directory.CreateDirectory(TEMP_DIRECTORY);
     var out_path = Path.Combine(TEMP_DIRECTORY, Path.GetRandomFileName() + Path.GetExtension(file.FileName));
 
-    lock (active_paths_lock)
-        if (!active_paths.Add(out_path))
-            throw new Exception("Somehow a random path already existed, this should not occur: " + out_path);
+    if (!active_tasks.TryAdd(out_path, null))
+        throw new Exception("Somehow a random path already existed, this should not occur: " + out_path);
 
     var final_path = out_path;
+    var final_filename = file.FileName;
+    var final_content_type = file.ContentType;
     try
     {
         // download it
@@ -69,14 +75,37 @@ app.MapPost("/", async (HttpContext context) =>
 
         log.LogInformation("File '{0}' downloaded to '{1}'", file.FileName, out_path);
 
-        // do we need to encode it or just forward it?
-        var encode = config.encode_types?.Contains(file.ContentType, StringComparer.OrdinalIgnoreCase) == true;
-        if (encode)
+        // check if we can/should encode it
+        EncodingProfile? profile = null;
+        if (config.encoding_profiles != null)
+            foreach (var p in config.encoding_profiles)
+            {
+                if (p.target_types != null && p.target_types.Contains(file.ContentType, StringComparer.OrdinalIgnoreCase) == true)
+                {
+                    profile = p;
+                    break;
+                }
+            }
+
+        if (profile != null)
         {
             log.LogInformation("File '{0}' started encoding", out_path);
 
-            // TODO: encode locally first and override final_path
-            final_path = out_path; // encoded path
+            using var encoder = new EncodingProcess(out_path, profile);
+            if (!active_tasks.TryUpdate(out_path, encoder, null))
+                throw new Exception("Failed to register encoder for file: " + out_path);
+
+            if (!await encoder.RunAsync())
+                throw new Exception("Failed to encode file: " + out_path);
+
+            log.LogInformation("File '{0}' finished encoding to '{1}'", out_path, encoder.OutputPath);
+            final_path = encoder.OutputPath ?? throw new Exception("Missing encoded path");
+            final_content_type = profile.content_type ?? final_content_type;
+
+            var ext = profile.extension ?? Path.GetExtension(file.FileName);
+            if (!ext.StartsWith('.')) ext = $".{ext}";
+
+            final_filename = Path.GetFileNameWithoutExtension(file.FileName) + ext;
         }
 
         // Prepare forward request
@@ -87,8 +116,8 @@ app.MapPost("/", async (HttpContext context) =>
         await using var fs = File.OpenRead(final_path);
 
         var streamContent = new StreamContent(fs);
-        streamContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType); // TODO: determine programmatically
-        multipart.Add(streamContent, file.Name, file.FileName);
+        streamContent.Headers.ContentType = new MediaTypeHeaderValue(final_content_type);
+        multipart.Add(streamContent, file.Name, final_filename);
 
         // Forward headers
         foreach (var h in headers_to_forward)
@@ -111,6 +140,7 @@ app.MapPost("/", async (HttpContext context) =>
         await response.Content.CopyToAsync(context.Response.Body);
 
         return Results.Empty;
+
     }
     catch (Exception ex)
     {
@@ -119,8 +149,10 @@ app.MapPost("/", async (HttpContext context) =>
     }
     finally
     {
-        lock (active_paths_lock)
-            active_paths.Remove(out_path);
+        if (active_tasks.TryRemove(out_path, out var encoding_process))
+        {
+            encoding_process?.Dispose();
+        }
 
         // delete file later
         _ = Task.Delay(1000).ContinueWith(t =>
@@ -134,4 +166,5 @@ app.MapPost("/", async (HttpContext context) =>
     }
 });
 
-app.Run($"http://127.0.0.1:{config.listen_port}");
+app.Urls.Add($"http://127.0.0.1:{config.listen_port}");
+await app.RunAsync(csc.Token);
