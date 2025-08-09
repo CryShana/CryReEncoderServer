@@ -5,6 +5,20 @@ public class Configuration
 {
     public uint listen_port { get; set; } = 9200;
     public uint max_body_size_mb { get; set; } = 5000;
+    /// <summary>
+    /// <para>
+    /// Directory that contains original files that were uploaded to this server
+    /// Accepts change-able path parameters like $dd (day) $MM (month) or $YYYY (year)
+    /// </para>
+    /// <para>
+    /// Example: "C:/Users/Username/Documents/ShareX/Screenshots/$YYYY-$MM"
+    /// </para>
+    /// </summary>
+    public string? original_file_directory { get; set; }
+    /// <summary>
+    /// If true and original_file_directory set, will try to delete original file after successful upload
+    /// </summary>
+    public bool delete_original_after_upload { get; set; } = false;
     public EncodingProfile[] encoding_profiles { get; set; } = [
         new() {
             command = "-c:v libsvtav1 -preset 5 -crf 40 -g 240 -svtav1-params tune=0:fast-decode=1 -c:a libopus -ac 2 -b:a 128k",

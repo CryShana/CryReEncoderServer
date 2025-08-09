@@ -144,6 +144,32 @@ app.MapPost("/", async (HttpContext context) =>
         // Copy content
         await response.Content.CopyToAsync(context.Response.Body);
 
+        // HANDLE POST effects
+        if (response.IsSuccessStatusCode && config.delete_original_after_upload)
+        {
+            var orig_path = GetOriginalDirectory(config);
+            if (orig_path != null) _ = Task.Delay(1000).ContinueWith(t =>
+                {
+                    if (Directory.Exists(orig_path))
+                    {
+                        var orig_file_path = Path.Combine(orig_path, file.FileName);
+                        if (File.Exists(orig_file_path))
+                        {
+                            File.Delete(orig_file_path);
+                            log.LogInformation("File '{0}' deleted from original directory", file.FileName);
+                        }
+                        else
+                        {
+                            log.LogWarning("Failed to delete original file, file not found: {0}", orig_file_path);
+                        }
+                    }
+                    else
+                    {
+                       log.LogWarning("Failed to delete original file, directory not found: {0}", orig_path); 
+                    }
+                });
+        }
+
         return Results.Empty;
     }
     catch (Exception ex)
@@ -172,3 +198,27 @@ app.MapPost("/", async (HttpContext context) =>
 
 app.Urls.Add($"http://127.0.0.1:{config.listen_port}");
 await app.RunAsync(csc.Token);
+
+
+// FUNCTIONS
+static string? GetOriginalDirectory(Configuration config)
+{
+    if (string.IsNullOrEmpty(config.original_file_directory))
+        return null;
+
+    // Replace following:
+    // - $YYYY  = current year
+    // - $MM    = zero-padded month
+    // - $M     = month
+    // - $dd    = zero-padded day
+    // - $d     = day
+    var now = DateTime.Now;
+    var path = config.original_file_directory
+        .Replace("$YYYY", now.Year.ToString())
+        .Replace("$MM", now.Month.ToString("00"))
+        .Replace("$M", now.Month.ToString())
+        .Replace("$dd", now.Day.ToString("00"))
+        .Replace("$d", now.Day.ToString());
+
+    return path;
+}
