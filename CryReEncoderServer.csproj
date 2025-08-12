@@ -9,4 +9,8 @@
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Content Remove="out/**" />
+  </ItemGroup>
+
 </Project>
