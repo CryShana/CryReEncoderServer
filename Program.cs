@@ -23,13 +23,17 @@ builder.Logging.AddFilter("Microsoft.AspNetCore.Routing.EndpointMiddleware", Log
 builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.None);
 
 // no limit
-builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = config.max_body_size_mb == 0 ? null : (config.max_body_size_mb * 1024 * 1024));
-builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = config.max_body_size_mb == 0 ? long.MaxValue : (config.max_body_size_mb * 1024 * 1024));
+long? limit_bytes = config.max_body_size_mb == 0 ? null : ((long)config.max_body_size_mb * 1024 * 1024);
+builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = limit_bytes);
+builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = !limit_bytes.HasValue ? long.MaxValue : limit_bytes.Value);
 
 var app = builder.Build();
 
 var factory = app.Services.GetRequiredService<ILoggerFactory>();
 var log = factory.CreateLogger("ReEncoder");
+
+if (limit_bytes.HasValue) 
+    log.LogInformation("Max request body set to {0} bytes ({1} MB)", limit_bytes.Value, config.max_body_size_mb);
 
 var active_tasks = new ConcurrentDictionary<string, EncodingProcess?>();
 var csc = new CancellationTokenSource();
