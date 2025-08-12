@@ -32,7 +32,7 @@ var app = builder.Build();
 var factory = app.Services.GetRequiredService<ILoggerFactory>();
 var log = factory.CreateLogger("ReEncoder");
 
-if (limit_bytes.HasValue) 
+if (limit_bytes.HasValue)
     log.LogInformation("Max request body set to {0} bytes ({1} MB)", limit_bytes.Value, config.max_body_size_mb);
 
 var active_tasks = new ConcurrentDictionary<string, EncodingProcess?>();
@@ -64,7 +64,7 @@ app.MapPost("/", async (HttpContext context) =>
 
     var file = context.Request.Form.Files[0];
 
-    log.Log(LogLevel.Information, "Forward request received for file '{0}' ({1})", file.FileName, file.ContentType);
+    log.Log(LogLevel.Information, "Started receiving file '{0}' ({1})", file.FileName, file.ContentType);
 
     // first copy it to local file
     Directory.CreateDirectory(TEMP_DIRECTORY);
@@ -169,7 +169,7 @@ app.MapPost("/", async (HttpContext context) =>
                     }
                     else
                     {
-                       log.LogWarning("Failed to delete original file, directory not found: {0}", orig_path); 
+                        log.LogWarning("Failed to delete original file, directory not found: {0}", orig_path);
                     }
                 });
         }
@@ -189,8 +189,34 @@ app.MapPost("/", async (HttpContext context) =>
         }
 
         // delete file later
-        _ = Task.Delay(1000).ContinueWith(t =>
+        _ = Task.Delay(1500).ContinueWith(t =>
         {
+            // FIRST TRY TO MOVE IT IF NEEDED
+            var orig_path = GetOriginalDirectory(config);
+            if (orig_path != null && config.move_forwarded_to_original_directory)
+            {
+                var file_to_move = File.Exists(final_path) ? final_path : out_path;
+                if (File.Exists(file_to_move))
+                {
+                    try
+                    {
+                        var file_destination = Path.Combine(orig_path, Path.GetFileName(final_filename));
+                        if (File.Exists(file_destination)) throw new Exception("Destination file already exists");
+                        File.Move(file_to_move, file_destination);
+                        log.LogInformation("File '{0}' moved to original directory", final_filename);
+                    }
+                    catch (Exception ex)
+                    {
+                        log.LogError("Failed to move file '{0}' to original folder, {1}", file_to_move, ex.Message);
+                    }
+                }
+                else
+                {
+                    log.LogWarning("Failed to move file '{0}' to original folder", file_to_move);
+                }
+            }
+
+            // DELETE THE REST / CLEANUP
             if (File.Exists(out_path))
                 File.Delete(out_path);
 

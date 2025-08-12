@@ -19,9 +19,14 @@ public class Configuration
     /// If true and original_file_directory set, will try to delete original file after successful upload
     /// </summary>
     public bool delete_original_after_upload { get; set; } = false;
+    /// <summary>
+    /// If true and original_file_directory set, will try to move the forwarded file to original file directory after successful upload
+    /// (replacing the file only if same name and content)
+    /// </summary>
+    public bool move_forwarded_to_original_directory { get; set; } = false;
     public EncodingProfile[] encoding_profiles { get; set; } = [
         new() {
-            command = "-c:v libsvtav1 -preset 5 -crf 40 -g 240 -svtav1-params tune=0:fast-decode=1 -c:a libopus -ac 2 -b:a 128k",
+            command = "-c:v libsvtav1 -preset 5 -crf 43 -g 240 -svtav1-params tune=0:fast-decode=1 -c:a libopus -ac 2 -b:a 128k",
             extension = "webm",
             content_type = "video/webm"
         }
