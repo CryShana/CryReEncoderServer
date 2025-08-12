@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Net.Http.Headers;
+using CryReEncoderServer;
 using Microsoft.AspNetCore.Http.Features;
 
 // clear temp directory from any last runs
@@ -80,16 +81,28 @@ app.MapPost("/", async (HttpContext context) =>
     {
         // download it
         using (var file_stream = File.Create(out_path))
+        {
             await file.OpenReadStream().CopyToAsync(file_stream);
 
-        log.LogInformation("File '{0}' downloaded to '{1}'", file.FileName, out_path);
+            log.LogInformation("File '{0}' downloaded to '{1}'", file.FileName, out_path);
+
+            if (config.fix_content_type)
+            {
+                var fixed_content_type = ContentTypeDetector.Fix(file_stream, final_content_type);
+                if (fixed_content_type != final_content_type)
+                    log.LogInformation("File '{0}' type fixed from '{1}' to '{2}'",
+                        file.FileName, final_content_type, fixed_content_type);
+
+                final_content_type = fixed_content_type;
+            }
+        }
 
         // check if we can/should encode it
         EncodingProfile? profile = null;
         if (config.encoding_profiles != null)
             foreach (var p in config.encoding_profiles)
             {
-                if (p.target_types != null && p.target_types.Contains(file.ContentType, StringComparer.OrdinalIgnoreCase) == true)
+                if (p.target_types != null && p.target_types.Contains(final_content_type, StringComparer.OrdinalIgnoreCase) == true)
                 {
                     profile = p;
                     break;

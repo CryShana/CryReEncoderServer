@@ -6,6 +6,10 @@ public class Configuration
     public uint listen_port { get; set; } = 9200;
     public uint max_body_size_mb { get; set; } = 5000;
     /// <summary>
+    /// If true, will attempt to fix content type of sent file if mismatched
+    /// </summary>
+    public bool fix_content_type { get; set; } = false;
+    /// <summary>
     /// <para>
     /// Directory that contains original files that were uploaded to this server
     /// Accepts change-able path parameters like $dd (day) $MM (month) or $YYYY (year)
