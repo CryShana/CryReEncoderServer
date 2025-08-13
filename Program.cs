@@ -77,6 +77,7 @@ app.MapPost("/", async (HttpContext context) =>
     var final_path = out_path;
     var final_filename = file.FileName;
     var final_content_type = file.ContentType;
+    var original_file_exists = false;
     try
     {
         // download it
@@ -162,14 +163,17 @@ app.MapPost("/", async (HttpContext context) =>
         await response.Content.CopyToAsync(context.Response.Body);
 
         // HANDLE POST effects
-        if (response.IsSuccessStatusCode && config.delete_original_after_upload)
+        var orig_path = GetOriginalDirectory(config);
+        var orig_file_path = Path.Combine(orig_path ?? "", file.FileName);
+        original_file_exists = File.Exists(orig_file_path);
+
+        // DELETE ORIGINAL FILE (if enabled)
+        if (response.IsSuccessStatusCode && config.delete_original_after_upload && orig_path != null)
         {
-            var orig_path = GetOriginalDirectory(config);
-            if (orig_path != null) _ = Task.Delay(1000).ContinueWith(t =>
+            _ = Task.Delay(1000).ContinueWith(t =>
                 {
                     if (Directory.Exists(orig_path))
                     {
-                        var orig_file_path = Path.Combine(orig_path, file.FileName);
                         if (File.Exists(orig_file_path))
                         {
                             File.Delete(orig_file_path);
@@ -177,7 +181,7 @@ app.MapPost("/", async (HttpContext context) =>
                         }
                         else
                         {
-                            log.LogWarning("Failed to delete original file, file not found: {0}", orig_file_path);
+                            log.LogInformation("File '{0}' missing in original directory, deletion skipped", file.FileName);
                         }
                     }
                     else
@@ -204,28 +208,35 @@ app.MapPost("/", async (HttpContext context) =>
         // delete file later
         _ = Task.Delay(1500).ContinueWith(t =>
         {
-            // FIRST TRY TO MOVE IT IF NEEDED
+            // FIRST TRY TO MOVE IT IF NEEDED (we move only if original file was also there, otherwise no point)
             var orig_path = GetOriginalDirectory(config);
             if (orig_path != null && config.move_forwarded_to_original_directory)
             {
-                var file_to_move = File.Exists(final_path) ? final_path : out_path;
-                if (File.Exists(file_to_move))
+                if (original_file_exists)
                 {
-                    try
+                    var file_to_move = File.Exists(final_path) ? final_path : out_path;
+                    if (File.Exists(file_to_move))
                     {
-                        var file_destination = Path.Combine(orig_path, Path.GetFileName(final_filename));
-                        if (File.Exists(file_destination)) throw new Exception("Destination file already exists");
-                        File.Move(file_to_move, file_destination);
-                        log.LogInformation("File '{0}' moved to original directory", final_filename);
+                        try
+                        {
+                            var file_destination = Path.Combine(orig_path, Path.GetFileName(final_filename));
+                            if (File.Exists(file_destination)) throw new Exception("Destination file already exists");
+                            File.Move(file_to_move, file_destination);
+                            log.LogInformation("File '{0}' moved to original directory", final_filename);
+                        }
+                        catch (Exception ex)
+                        {
+                            log.LogError("Failed to move file '{0}' to original folder, {1}", file_to_move, ex.Message);
+                        }
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        log.LogError("Failed to move file '{0}' to original folder, {1}", file_to_move, ex.Message);
+                        log.LogWarning("Failed to move file '{0}' to original folder", file_to_move);
                     }
                 }
                 else
                 {
-                    log.LogWarning("Failed to move file '{0}' to original folder", file_to_move);
+                    log.LogInformation("File '{0}' skipped movement due to original file not existing", final_filename);
                 }
             }
 
