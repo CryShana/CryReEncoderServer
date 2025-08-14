@@ -41,6 +41,9 @@ var log = factory.CreateLogger("ReEncoder");
 if (limit_bytes.HasValue)
     log.LogInformation("Max request body set to {0} bytes ({1} MB)", limit_bytes.Value, config.max_body_size_mb);
 
+foreach (var p in config.encoding_profiles)
+    log.LogInformation("Loaded encoding profile '{0}'", p.command);
+
 var active_tasks = new ConcurrentDictionary<string, EncodingProcess?>();
 var csc = new CancellationTokenSource();
 var http = new HttpClient();
@@ -99,7 +102,7 @@ app.MapPost("/", async (HttpContext context) =>
         {
             await file.OpenReadStream().CopyToAsync(file_stream);
 
-            log.LogInformation("File '{0}' downloaded to '{1}'", file.FileName, out_path);
+            log.LogInformation("File '{0}' downloaded to '{1}' ({2})", file.FileName, out_path, GetHumanSize(file_stream.Length));
 
             if (config.fix_content_type)
             {
@@ -141,9 +144,9 @@ app.MapPost("/", async (HttpContext context) =>
                 if (!await encoder.RunAsync())
                     throw new Exception("Failed to encode file: " + out_path);
 
-                log.LogInformation("File '{0}' encoded to '{1}'", file.FileName, encoder.OutputPath);
                 final_path = encoder.OutputPath ?? throw new Exception("Missing encoded path");
                 final_content_type = profile.content_type ?? final_content_type;
+                log.LogInformation("File '{0}' encoded to '{1}' ({2})", file.FileName, encoder.OutputPath, GetHumanSize(new FileInfo(final_path).Length));
 
                 var ext = profile.extension ?? Path.GetExtension(file.FileName);
                 if (!ext.StartsWith('.')) ext = $".{ext}";
@@ -302,4 +305,16 @@ static string? GetOriginalDirectory(Configuration config)
         .Replace("$d", now.Day.ToString());
 
     return path;
+}
+
+static string GetHumanSize(long size_bytes)
+{
+    return size_bytes switch
+    {
+        < 1000 => $"{size_bytes} bytes",
+        < 1000_000 => $"{size_bytes / 1000.0:0.00} kB",
+        < 1000_000_000 => $"{size_bytes / 1000_000.0:0.00} MB",
+        < 1000_000_000_000 => $"{size_bytes / 1000_000_000.0:0.00} GB",
+        _ => $"{size_bytes / 1000_000_000_000.0:0.00} TB",
+    };
 }
