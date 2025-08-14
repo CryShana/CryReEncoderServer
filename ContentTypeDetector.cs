@@ -9,6 +9,7 @@ public static class ContentTypeDetector
 
         Span<byte> buffer = stackalloc byte[30];
         stream.ReadExactly(buffer);
+        stream.Seek(0, SeekOrigin.Begin);
 
         // now determine common media types based on header
 
@@ -71,10 +72,6 @@ public static class ContentTypeDetector
         // FLAC: fLaC
         if (buffer is [0x66, 0x4C, 0x61, 0x43, ..])
             return "audio/flac";
-
-        // MP4/MOV: ....ftyp at offset 4
-        if (buffer.Length >= 8 && buffer is [_, _, _, _, 0x66, 0x74, 0x79, 0x70, ..])
-            return "video/mp4";
 
         // AVI: RIFF....AVI 
         if (buffer is [0x52, 0x49, 0x46, 0x46, _, _, _, _, 0x41, 0x56, 0x49, 0x20, ..])
