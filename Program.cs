@@ -247,21 +247,21 @@ app.MapPost("/", async (HttpContext context) =>
                     var file_to_move = File.Exists(final_path) ? final_path : out_path;
                     if (File.Exists(file_to_move))
                     {
+                        var file_destination = Path.Combine(orig_path, Path.GetFileName(final_filename));
                         try
                         {
-                            var file_destination = Path.Combine(orig_path, Path.GetFileName(final_filename));
                             if (File.Exists(file_destination)) throw new Exception("Destination file already exists");
                             File.Move(file_to_move, file_destination);
                             log.LogInformation("File '{0}' moved to original directory", final_filename);
                         }
                         catch (Exception ex)
                         {
-                            log.LogError("Failed to move file '{0}' to original folder, {1}", file_to_move, ex.Message);
+                            log.LogError("Failed to move file '{0}' to '{1}', {2}", file_to_move, file_destination, ex.Message);
                         }
                     }
                     else
                     {
-                        log.LogWarning("Failed to move file '{0}' to original folder", file_to_move);
+                        log.LogWarning("Failed to move file '{0}' to original folder, it doesn't exist anymore", file_to_move);
                     }
                 }
                 else
