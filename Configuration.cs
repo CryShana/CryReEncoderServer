@@ -10,6 +10,10 @@ public class Configuration
     /// </summary>
     public bool fix_content_type { get; set; } = false;
     /// <summary>
+    /// Max amount of this many encoders will run at the same time (others will wait)
+    /// </summary>
+    public int max_concurrent_encoders { get; set; } = 2;
+    /// <summary>
     /// <para>
     /// Directory that contains original files that were uploaded to this server
     /// Accepts change-able path parameters like $dd (day) $MM (month) or $YYYY (year)

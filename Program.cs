@@ -9,7 +9,9 @@ if (Directory.Exists(TEMP_DIRECTORY))
     foreach (var f in Directory.GetFiles(TEMP_DIRECTORY))
         File.Delete(f);
 
-// PREPARE SERVER
+// ---------------------------
+// BUILDER CONFIGURATION
+// ---------------------------
 var config = Configuration.LoadOrCreateNew();
 
 var builder = WebApplication.CreateSlimBuilder();
@@ -28,6 +30,9 @@ long? limit_bytes = config.max_body_size_mb == 0 ? null : ((long)config.max_body
 builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = limit_bytes);
 builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = !limit_bytes.HasValue ? long.MaxValue : limit_bytes.Value);
 
+// ---------------------------
+// APP CONFIGURATION
+// ---------------------------
 var app = builder.Build();
 
 var factory = app.Services.GetRequiredService<ILoggerFactory>();
@@ -46,6 +51,15 @@ Console.CancelKeyPress += (_, b) =>
     b.Cancel = true;
 };
 
+// semaphore for encders
+if (config.max_concurrent_encoders <= 0)
+    config.max_concurrent_encoders = 1;
+
+var semaphore = new SemaphoreSlim(config.max_concurrent_encoders);
+
+// ---------------------------
+// ENDPOINTS
+// ---------------------------
 app.MapGet("/", () => "CryReEncoder is active and listening, please use POST method");
 app.MapPost("/", async (HttpContext context) =>
 {
@@ -112,23 +126,34 @@ app.MapPost("/", async (HttpContext context) =>
 
         if (profile != null)
         {
-            log.LogInformation("File '{0}' now encoding", file.FileName);
+            if (semaphore.CurrentCount == 0)
+                log.LogInformation("File '{0}' waiting to start encoding", file.FileName);
 
-            using var encoder = new EncodingProcess(out_path, profile);
-            if (!active_tasks.TryUpdate(out_path, encoder, null))
-                throw new Exception("Failed to register encoder for file: " + out_path);
+            await semaphore.WaitAsync();
+            try
+            {
+                log.LogInformation("File '{0}' now encoding", file.FileName);
 
-            if (!await encoder.RunAsync())
-                throw new Exception("Failed to encode file: " + out_path);
+                using var encoder = new EncodingProcess(out_path, profile);
+                if (!active_tasks.TryUpdate(out_path, encoder, null))
+                    throw new Exception("Failed to register encoder for file: " + out_path);
 
-            log.LogInformation("File '{0}' encoded to '{1}'", file.FileName, encoder.OutputPath);
-            final_path = encoder.OutputPath ?? throw new Exception("Missing encoded path");
-            final_content_type = profile.content_type ?? final_content_type;
+                if (!await encoder.RunAsync())
+                    throw new Exception("Failed to encode file: " + out_path);
 
-            var ext = profile.extension ?? Path.GetExtension(file.FileName);
-            if (!ext.StartsWith('.')) ext = $".{ext}";
+                log.LogInformation("File '{0}' encoded to '{1}'", file.FileName, encoder.OutputPath);
+                final_path = encoder.OutputPath ?? throw new Exception("Missing encoded path");
+                final_content_type = profile.content_type ?? final_content_type;
 
-            final_filename = Path.GetFileNameWithoutExtension(file.FileName) + ext;
+                var ext = profile.extension ?? Path.GetExtension(file.FileName);
+                if (!ext.StartsWith('.')) ext = $".{ext}";
+
+                final_filename = Path.GetFileNameWithoutExtension(file.FileName) + ext;
+            }
+            finally
+            {
+                semaphore.Release();
+            }
         }
 
         // Prepare forward request
@@ -181,7 +206,7 @@ app.MapPost("/", async (HttpContext context) =>
                         }
                         else
                         {
-                            log.LogInformation("File '{0}' missing in original directory, deletion skipped", file.FileName);
+                            //log.LogInformation("File '{0}' missing in original directory, deletion skipped", file.FileName);
                         }
                     }
                     else
@@ -254,7 +279,9 @@ app.Urls.Add($"http://127.0.0.1:{config.listen_port}");
 await app.RunAsync(csc.Token);
 
 
+// ---------------------------
 // FUNCTIONS
+// ---------------------------
 static string? GetOriginalDirectory(Configuration config)
 {
     if (string.IsNullOrEmpty(config.original_file_directory))
