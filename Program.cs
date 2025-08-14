@@ -25,6 +25,8 @@ builder.Logging.SetMinimumLevel(LogLevel.Information);
 builder.Logging.AddFilter("Microsoft.AspNetCore.Routing.EndpointMiddleware", LogLevel.None);
 builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.None);
 
+builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolver = JsonContext.Default);
+
 // no limit
 long? limit_bytes = config.max_body_size_mb == 0 ? null : ((long)config.max_body_size_mb * 1024 * 1024);
 builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = limit_bytes);
@@ -63,7 +65,7 @@ var semaphore = new SemaphoreSlim(config.max_concurrent_encoders);
 // ---------------------------
 // ENDPOINTS
 // ---------------------------
-app.MapGet("/", () => "CryReEncoder is active and listening, please use POST method");
+app.MapGet("/", () => Results.Ok("CryReEncoder is running. Please use the POST endpoint to forward files"));
 app.MapPost("/", async (HttpContext context) =>
 {
     if (!context.Request.HasFormContentType)
@@ -142,7 +144,7 @@ app.MapPost("/", async (HttpContext context) =>
                     throw new Exception("Failed to register encoder for file: " + out_path);
 
                 if (!await encoder.RunAsync())
-                    throw new Exception("Failed to encode file: " + out_path);
+                    throw new Exception("Failed to encode file: " + out_path + ", FFmpeg output:\n" + encoder.Log);
 
                 final_path = encoder.OutputPath ?? throw new Exception("Missing encoded path");
                 final_content_type = profile.content_type ?? final_content_type;
