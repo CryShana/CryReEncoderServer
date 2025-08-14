@@ -30,9 +30,46 @@ public class Configuration
     public bool move_forwarded_to_original_directory { get; set; } = false;
     public EncodingProfile[] encoding_profiles { get; set; } = [
         new() {
-            command = "-c:v libsvtav1 -preset 5 -crf 43 -g 240 -svtav1-params tune=0:fast-decode=1 -c:a libopus -ac 2 -b:a 128k",
+            command = "-c:v libsvtav1 -preset 5 -crf 45 -g 240 -svtav1-params tune=0:fast-decode=1 -c:a libopus -ac 2 -b:a 128k",
             extension = "webm",
-            content_type = "video/webm"
+            content_type = "video/webm",
+            target_types = [
+                "video/mp4",                // .mp4
+                "video/mpeg",               // .mpeg, .mpg
+                "video/mts",                // .mts
+                "video/webm",               // .webm
+                "video/x-msvideo",          // .avi
+                "video/quicktime",          // .mov
+                "video/x-flv",              // .flv
+                "video/ogg",                // .ogv
+                "application/vnd.rn-realmedia", // .rm
+                "video/x-ms-wmv",           // .wmv
+                "video/3gpp",               // .3gp
+                "video/3gpp2",              // .3g2
+                "video/x-matroska",         // .mkv
+                "video/h264",               // rarely used standalone
+                "video/h265",               // rarely used standalone
+                "video/x-f4v",              // .f4v
+                "video/x-ms-asf"            // .asf
+            ]    
+        },
+        new() {
+            command = "-c:v libaom-av1 -crf 18 -cpu-used 0 -row-mt 1 -tiles 4x4 -aq-mode 2",
+            extension = "avif",
+            content_type = "image/avif",
+            target_types = [
+                "image/jpeg",
+                "image/png",
+                "image/bmp"
+            ]
+        },
+        new() {
+            command = "-c:v libaom-av1 -crf 30 -cpu-used 6 -row-mt 1 -tiles 2x2 -aq-mode 2",
+            extension = "avif",
+            content_type = "image/avif",
+            target_types = [
+                "image/gif"
+            ]
         }
     ];
 
@@ -70,22 +107,10 @@ public class EncodingProfile
     /// Content types that are targeted by this profile
     /// </summary>
     public string[] target_types { get; set; } = [
-        "video/mp4",                // .mp4
-        "video/mpeg",               // .mpeg, .mpg
-        "video/webm",               // .webm
-        "video/x-msvideo",          // .avi
-        "video/quicktime",          // .mov
-        "video/x-flv",              // .flv
-        "video/ogg",                // .ogv
-        "application/vnd.rn-realmedia", // .rm
-        "video/x-ms-wmv",           // .wmv
-        "video/3gpp",               // .3gp
-        "video/3gpp2",              // .3g2
-        "video/x-matroska",         // .mkv
-        "video/h264",               // rarely used standalone
-        "video/h265",               // rarely used standalone
-        "video/x-f4v",              // .f4v
-        "video/x-ms-asf"            // .asf
+        "video/mp4",
+        "video/mpeg",
+        "video/webm",
+        "video/x-msvideo"
     ];
 }
 
