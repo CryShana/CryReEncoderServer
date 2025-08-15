@@ -58,7 +58,7 @@ public class Configuration
             ]    
         },
         new() {
-            command = "-c:v libaom-av1 -crf 20 -cpu-used 0 -row-mt 1 -tiles 2x2 -aq-mode 2",
+            command = "-c:v libaom-av1 -crf 24 -cpu-used 0 -row-mt 1 -tiles 2x2 -aq-mode 2",
             extension = "avif",
             content_type = "image/avif",
             target_types = [
