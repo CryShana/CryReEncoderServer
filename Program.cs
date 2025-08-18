@@ -62,6 +62,8 @@ if (config.max_concurrent_encoders <= 0)
 
 var semaphore = new SemaphoreSlim(config.max_concurrent_encoders);
 
+var check_transparency = config.encoding_profiles.Any(x => x.exclude_transparent_input);
+
 // ---------------------------
 // ENDPOINTS
 // ---------------------------
@@ -100,6 +102,7 @@ app.MapPost("/", async (HttpContext context) =>
     try
     {
         // download it
+        bool has_transparency = false;
         using (var file_stream = File.Create(out_path))
         {
             await file.OpenReadStream().CopyToAsync(file_stream);
@@ -117,12 +120,32 @@ app.MapPost("/", async (HttpContext context) =>
             }
         }
 
+        if (check_transparency)
+        {
+            if (final_content_type.Contains("image/") || final_content_type.Contains("video/"))
+            {
+                using var investigator = new InvestigationProcess(out_path);
+                var t = await investigator.HasTransparency();
+                if (t.HasValue)
+                {
+                    has_transparency = t.Value;
+                    log.LogInformation("File '{0}' has transparency: {1}", file.FileName, has_transparency);
+                }
+                else
+                {
+                    log.LogWarning("File '{0}' failed to be checked for transparency", file.FileName);
+                }
+            }
+        }
+
         // check if we can/should encode it
         EncodingProfile? profile = null;
         if (config.encoding_profiles != null)
             foreach (var p in config.encoding_profiles)
             {
-                if (p.target_types != null && p.target_types.Contains(final_content_type, StringComparer.OrdinalIgnoreCase) == true)
+                if (p.target_types != null &&
+                    p.target_types.Contains(final_content_type, StringComparer.OrdinalIgnoreCase) == true &&
+                    (!p.exclude_transparent_input || !has_transparency))
                 {
                     profile = p;
                     break;

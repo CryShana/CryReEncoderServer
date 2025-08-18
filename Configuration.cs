@@ -37,6 +37,7 @@ public class Configuration
             command = "-c:v libsvtav1 -preset 5 -crf 45 -g 240 -svtav1-params tune=0:fast-decode=1 -c:a libopus -ac 2 -b:a 128k",
             extension = "webm",
             content_type = "video/webm",
+            exclude_transparent_input = true,
             target_types = [
                 "video/mp4",                // .mp4
                 "video/mpeg",               // .mpeg, .mpg
@@ -61,6 +62,7 @@ public class Configuration
             command = "-c:v libaom-av1 -crf 24 -cpu-used 0 -row-mt 1 -tiles 2x2 -aq-mode 2",
             extension = "avif",
             content_type = "image/avif",
+            exclude_transparent_input = true,
             target_types = [
                 "image/jpeg",
                 "image/png",
@@ -71,6 +73,7 @@ public class Configuration
             command = "-c:v libaom-av1 -crf 30 -cpu-used 6 -row-mt 1 -tiles 2x2 -aq-mode 2",
             extension = "avif",
             content_type = "image/avif",
+            exclude_transparent_input = true,
             target_types = [
                 "image/gif"
             ]
@@ -107,6 +110,10 @@ public class EncodingProfile
     /// Output content type
     /// </summary>
     public string? content_type { get; set; } = "video/mp4";
+    /// <summary>
+    /// If true, will check input if it contains transparent pixels. If yes, will exclude this profile
+    /// </summary>
+    public bool exclude_transparent_input { get; set; } = false;
     /// <summary>
     /// Content types that are targeted by this profile
     /// </summary>
