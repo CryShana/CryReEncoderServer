@@ -42,7 +42,6 @@ public class Configuration
                 "video/mp4",                // .mp4
                 "video/mpeg",               // .mpeg, .mpg
                 "video/mts",                // .mts
-                "video/webm",               // .webm
                 "video/x-msvideo",          // .avi
                 "video/quicktime",          // .mov
                 "video/x-flv",              // .flv
@@ -56,10 +55,22 @@ public class Configuration
                 "video/h265",               // rarely used standalone
                 "video/x-f4v",              // .f4v
                 "video/x-ms-asf"            // .asf
-            ]    
+            ]
         },
         new() {
-            command = "-c:v libaom-av1 -crf 24 -cpu-used 0 -row-mt 1 -tiles 2x2 -aq-mode 2",
+            executable_override = "avifenc",
+            command = "-q 80 -s 2 $INPUT $OUTPUT",
+            extension = "avif",
+            content_type = "image/avif",
+            exclude_transparent_input = false,
+            target_types = [
+                "image/jpeg",
+                "image/png",
+                "image/bmp"
+            ]
+        },
+        new() {
+            command = "-c:v libaom-av1 -crf 24 -cpu-used 2 -row-mt 1 -tiles 2x2 -aq-mode 2",
             extension = "avif",
             content_type = "image/avif",
             exclude_transparent_input = true,
@@ -99,7 +110,11 @@ public class Configuration
 public class EncodingProfile
 {
     /// <summary>
-    /// FFmpeg command, excludes the input and output
+    /// In cases where you want to use a tool other than FFmpeg, can override it here. Command will be appended to it
+    /// </summary>
+    public string? executable_override { get; set; } = "";
+    /// <summary>
+    /// FFmpeg command, excludes the input and output. You can override input and output by entering $INPUT and $OUTPUT
     /// </summary>
     public string? command { get; set; } = "-c:v libx264 -crf 30 -preset medium";
     /// <summary>

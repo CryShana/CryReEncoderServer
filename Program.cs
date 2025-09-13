@@ -44,7 +44,7 @@ if (limit_bytes.HasValue)
     log.LogInformation("Max request body set to {0} bytes ({1} MB)", limit_bytes.Value, config.max_body_size_mb);
 
 foreach (var p in config.encoding_profiles)
-    log.LogInformation("Loaded encoding profile '{0}'", p.command);
+    log.LogInformation("Loaded profile '{0}'", p.command);
 
 var active_tasks = new ConcurrentDictionary<string, EncodingProcess?>();
 var csc = new CancellationTokenSource();
@@ -133,7 +133,7 @@ app.MapPost("/", async (HttpContext context) =>
                 }
                 else
                 {
-                    log.LogWarning("File '{0}' failed to be checked for transparency", file.FileName);
+                    log.LogInformation("File '{0}' has transparency: {1}", file.FileName, false);
                 }
             }
         }
@@ -166,7 +166,7 @@ app.MapPost("/", async (HttpContext context) =>
                 if (!active_tasks.TryUpdate(out_path, encoder, null))
                     throw new Exception("Failed to register encoder for file: " + out_path);
 
-                if (!await encoder.RunAsync())
+                if (!await encoder.RunAsync(log))
                     throw new Exception("Failed to encode file: " + out_path + ", FFmpeg output:\n" + encoder.Log);
 
                 final_path = encoder.OutputPath ?? throw new Exception("Missing encoded path");

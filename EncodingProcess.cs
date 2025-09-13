@@ -2,6 +2,7 @@ using System.Diagnostics;
 
 public class EncodingProcess : IDisposable
 {
+    public string Executable { get; }
     public string InputPath { get; }
     public string? OutputPath { get; private set; }
     public EncodingProfile Profile { get; }
@@ -13,6 +14,7 @@ public class EncodingProcess : IDisposable
 
     public EncodingProcess(string input_path, EncodingProfile profile)
     {
+        Executable = string.IsNullOrEmpty(profile.executable_override) ? "ffmpeg" : profile.executable_override;
         Profile = profile;
         InputPath = input_path;
         Command = profile.command?.Trim() ?? "";
@@ -29,16 +31,32 @@ public class EncodingProcess : IDisposable
         OutputPath = Path.Combine(Path.GetDirectoryName(input_path) ?? ".", Path.GetFileNameWithoutExtension(input_path) + "_" + Path.GetRandomFileName() + Extension);
     }
 
-    public async Task<bool> RunAsync()
+    static string ProcessCommand(string command, string input, string output)
+    {
+        var has_overrides = command.IndexOf("$INPUT") >= 0 || command.IndexOf("$OUTPUT") >= 0;
+        if (has_overrides)
+        {
+            command = command.Replace("$INPUT", $"\"{input}\"");
+            command = command.Replace("$OUTPUT", $"\"{output}\"");
+            return command;
+        }
+
+        return $"""
+            -hide_banner -loglevel info -stats -i "{input}" {command} "{output}"
+        """;
+    }
+    
+    public async Task<bool> RunAsync(ILogger log)
     {
         if (_process != null) throw new InvalidOperationException("Encoding already started");
 
+        var command = ProcessCommand(Command, InputPath, OutputPath ?? "");
+        log.LogInformation("Started process: {0} {1}", Executable, command);
+
         var info = new ProcessStartInfo
         {
-            FileName = "ffmpeg",
-            Arguments = $"""
-            -hide_banner -loglevel info -stats -i "{InputPath}" {Command} "{OutputPath}"
-            """,
+            FileName = Executable,
+            Arguments = command,
             UseShellExecute = false,
             RedirectStandardError = true,
             RedirectStandardOutput = false,
